@@ -32,6 +32,7 @@ import static com.seventhmoon.tennisscoreboardplus.Data.FileOperation.check_file
 import static com.seventhmoon.tennisscoreboardplus.Data.FileOperation.clear_record;
 import static com.seventhmoon.tennisscoreboardplus.Data.FileOperation.init_folder_and_files;
 import static com.seventhmoon.tennisscoreboardplus.Data.InitData.mBluetoothAdapter;
+import static com.seventhmoon.tennisscoreboardplus.Data.InitData.mChatService;
 
 
 public class MainActivity extends AppCompatActivity {
@@ -68,6 +69,7 @@ public class MainActivity extends AppCompatActivity {
             Log.d(TAG, "This device is not support bluetooth");
         } else {
             if (mBluetoothAdapter.isEnabled()) {
+
                 Log.d(TAG, "Bluetooth is enabled");
             } else {
                 Log.d(TAG, "Bluetooth is disabled");

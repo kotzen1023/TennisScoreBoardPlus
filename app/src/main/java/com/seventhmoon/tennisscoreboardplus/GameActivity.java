@@ -7,9 +7,16 @@ import android.app.AlertDialog;
 import android.app.ProgressDialog;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
+import android.hardware.TriggerEvent;
+import android.hardware.TriggerEventListener;
 import android.os.Bundle;
 
 import android.os.Handler;
@@ -68,6 +75,7 @@ import static com.seventhmoon.tennisscoreboardplus.Data.StateAction.OPPT_SCORE;
 import static com.seventhmoon.tennisscoreboardplus.Data.StateAction.OPPT_SERVE;
 import static com.seventhmoon.tennisscoreboardplus.Data.StateAction.YOU_SCORE;
 import static com.seventhmoon.tennisscoreboardplus.Data.StateAction.YOU_SERVE;
+import static java.lang.Math.sqrt;
 
 
 public class GameActivity extends AppCompatActivity{
@@ -155,15 +163,66 @@ public class GameActivity extends AppCompatActivity{
     private MenuItem item_bluetooth;
 
 
+    private SensorManager mSensorManager;
+    private Sensor mAccelerometer;
+    private SensorEventListener accelerometerListener;
 
+    private static double PI = 3.1415926535897932384626433832795;
+    private static double gravity = 9.80665;
 
+    private static long previous_time = 0;
+    private static long current_time = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.game_layout);
+        Log.d(TAG, "onCreate");
 
         //mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+
+        if (mBluetoothAdapter.isEnabled()) {
+            if (mChatService == null) {
+                Log.d(TAG, "mChatService = null");
+                setupChat();
+            }
+        }
+
+        //sensor
+
+
+        mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
+
+        mAccelerometer = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+
+        if (mAccelerometer != null) {
+            Log.e(TAG, "Has mAccelerometer sensor!");
+        }
+
+        accelerometerListener = new SensorEventListener() {
+            @Override
+            public void onSensorChanged(SensorEvent event) {
+                current_time = System.currentTimeMillis();
+                double accel = sqrt(event.values[0]*event.values[0]+event.values[1]*event.values[1]);
+                //Log.d(TAG, "accel = "+accel+" sec = "+(current_time-previous_time));
+                //Log.d(TAG, "System.currentTimeMillis() = "+System.currentTimeMillis());
+                //Log.d(TAG, "X: " + String.valueOf(event.values[0]));
+                //Log.d(TAG, "Y: " + String.valueOf(event.values[1]));
+                //Log.d(TAG, "Z: " + String.valueOf(event.values[2]));
+                double time = (double) ((current_time-previous_time)/1000);
+                double distance = Accel2mms(accel, time);
+                Log.d(TAG, "accel = "+accel+" sec = "+time+" distance = "+distance);
+                previous_time = current_time;
+            }
+
+            @Override
+            public void onAccuracyChanged(Sensor sensor, int accuracy) {
+
+
+            }
+        };
+
+        mSensorManager.registerListener(accelerometerListener, mAccelerometer, SensorManager.SENSOR_DELAY_NORMAL);
 
         //for action bar
         ActionBar actionBar = getSupportActionBar();
@@ -878,6 +937,16 @@ public class GameActivity extends AppCompatActivity{
         btnYouScore.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+                String message = "You score";
+                byte[] send = message.getBytes();
+                if (mChatService != null) {
+                    mChatService.write(send);
+
+                    // Reset out string buffer to zero and clear the edit text field
+                    mOutStringBuffer.setLength(0);
+                }
+
+
                 //calculateScore(true);
                 if (imgWinCheckUp.getVisibility() == View.VISIBLE || imgWinCheckDown.getVisibility() == View.VISIBLE) {
                     Log.d(TAG, "Game is over!");
@@ -1097,6 +1166,14 @@ public class GameActivity extends AppCompatActivity{
         btnOpptScore.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+                String message = "Oppt score";
+                byte[] send = message.getBytes();
+                if (mChatService != null) {
+                    mChatService.write(send);
+
+                    // Reset out string buffer to zero and clear the edit text field
+                    mOutStringBuffer.setLength(0);
+                }
                 //calculateScore(false);
                 if (imgWinCheckUp.getVisibility() == View.VISIBLE || imgWinCheckDown.getVisibility() == View.VISIBLE) {
                     Log.d(TAG, "Game is over!");
@@ -3438,6 +3515,7 @@ public class GameActivity extends AppCompatActivity{
                         mChatService.start();
                     }
                 } else {
+                    Log.d(TAG, "mChatService = null");
                     setupChat();
                 }
             }
@@ -3475,10 +3553,12 @@ public class GameActivity extends AppCompatActivity{
                     // Otherwise, setup the chat session
                 } else if (mChatService == null) {
                     setupChat();
+                } else {
+                    intent = new Intent(GameActivity.this, DeviceListActivity.class);
+                    startActivityForResult(intent, REQUEST_CONNECT_DEVICE_SECURE);
                 }
 
-                intent = new Intent(GameActivity.this, DeviceListActivity.class);
-                startActivityForResult(intent, REQUEST_CONNECT_DEVICE_SECURE);
+
                 break;
 
             default:
@@ -3618,5 +3698,11 @@ public class GameActivity extends AppCompatActivity{
 
         // Initialize the buffer for outgoing messages
         mOutStringBuffer = new StringBuffer("");
+    }
+
+    double Accel2mms(double accel, double freq){
+        double result = 0;
+        result = (gravity*accel)/(2*PI*freq);
+        return result;
     }
 }
